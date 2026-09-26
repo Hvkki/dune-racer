@@ -16,14 +16,16 @@ function vnoise(x, z) {
   return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
 }
 
-// Raw dune height (before flattening near the track).
+// Bold, clearly-visible rolling dunes. Higher amplitude + a low-frequency
+// primary wave so the horizon actually undulates like sand dunes.
 function rawDune(wx, wz) {
-  let h = 0, amp = 7, f = 0.006;
-  for (let o = 0; o < 4; o++) {
-    h += (vnoise(wx * f, wz * f) - 0.5) * amp;
-    amp *= 0.5;
-    f *= 2.1;
-  }
+  let h = 0;
+  // primary big dunes
+  h += (vnoise(wx * 0.0045, wz * 0.0045) - 0.5) * 34;
+  // secondary ridges
+  h += (vnoise(wx * 0.011, wz * 0.011) - 0.5) * 14;
+  // fine ripples
+  h += (vnoise(wx * 0.03, wz * 0.03) - 0.5) * 3.5;
   return h;
 }
 
@@ -42,15 +44,22 @@ export class Environment {
     this.heightFn = (x, z) => this._height(x, z);
   }
 
+  // Height at a world point. Near the track we grade a smooth, banked corridor
+  // that sits at the track's own centerline height so the road never floats
+  // or gets buried, while the surrounding desert keeps its full dunes.
   _height(x, z) {
     const raw = rawDune(x, z);
     if (!this._track) return raw;
-    // Flatten near the racing line: blend raw height toward the road height.
-    const dist = this._track.distanceToTrack(x, z);
-    const flatBand = CONFIG.TRACK_WIDTH + 6;   // fully flat within this
-    const fadeBand = CONFIG.TRACK_WIDTH + 40;  // blend out to here
-    const k = smoothstep(flatBand, fadeBand, dist); // 0 near road, 1 far
-    return raw * k;
+
+    const { dist, height: roadH } = this._track.nearest(x, z);
+    // Tight corridor: fully graded to road height within the road + a small
+    // shoulder, then blend back to dunes over a short band so the walls of the
+    // corridor read as banked sand berms hugging the track.
+    const flatBand = CONFIG.TRACK_WIDTH + 26;   // wide graded raceway + run-off
+    const fadeBand = CONFIG.TRACK_WIDTH + 70;   // dunes fully back well outside
+    const k = smoothstep(flatBand, fadeBand, dist); // 0 on road, 1 in dunes
+    // Blend between the road height (flat corridor) and full dunes.
+    return THREE.MathUtils.lerp(roadH, raw, k);
   }
 
   attachTrack(track) {
@@ -60,56 +69,66 @@ export class Environment {
   }
 
   _buildSky() {
-    this.scene.fog = new THREE.Fog(0xe4c99a, CONFIG.FOG_NEAR, CONFIG.FOG_FAR);
+    // Warm, hazy desert atmosphere (Cairo-style). Fog tint matches the horizon.
+    this.scene.fog = new THREE.Fog(0xf0cf95, CONFIG.FOG_NEAR, CONFIG.FOG_FAR);
 
-    const skyGeo = new THREE.SphereGeometry(700, 32, 16);
+    const skyGeo = new THREE.SphereGeometry(760, 32, 20);
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       uniforms: {
-        top: { value: new THREE.Color(0x5aa9ff) },
-        bot: { value: new THREE.Color(0xf3d9a8) },
+        top: { value: new THREE.Color(0x2f6fd0) },   // deep blue zenith
+        mid: { value: new THREE.Color(0x7fb2e8) },   // pale blue
+        bot: { value: new THREE.Color(0xf0d4a0) },   // warm sand haze at horizon
+        sunDir: { value: new THREE.Vector3(0.5, 0.55, -0.6).normalize() },
+        sunColor: { value: new THREE.Color(0xffe9c0) },
       },
       vertexShader: `
-        varying float h;
+        varying vec3 vDir;
         void main() {
-          h = normalize(position).y;
+          vDir = normalize(position);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        varying float h;
-        uniform vec3 top;
-        uniform vec3 bot;
+        varying vec3 vDir;
+        uniform vec3 top; uniform vec3 mid; uniform vec3 bot;
+        uniform vec3 sunDir; uniform vec3 sunColor;
         void main() {
-          float t = clamp(h * 0.5 + 0.5, 0.0, 1.0);
-          gl_FragColor = vec4(mix(bot, top, t), 1.0);
+          float h = clamp(vDir.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 col = h < 0.5
+            ? mix(bot, mid, h * 2.0)
+            : mix(mid, top, (h - 0.5) * 2.0);
+          // sun glow
+          float d = max(dot(vDir, sunDir), 0.0);
+          col += sunColor * pow(d, 10.0) * 0.35;     // broad glow
+          col += sunColor * pow(d, 500.0) * 1.2;     // bright core
+          gl_FragColor = vec4(col, 1.0);
         }`,
     });
     this.scene.add(new THREE.Mesh(skyGeo, skyMat));
-
-    // A soft sun disc up in the sky.
-    const sunDisc = new THREE.Mesh(
-      new THREE.CircleGeometry(24, 32),
-      new THREE.MeshBasicMaterial({ color: 0xfff3d0, transparent: true, opacity: 0.9, fog: false })
-    );
-    sunDisc.position.set(180, 220, -300);
-    sunDisc.lookAt(0, 0, 0);
-    this.scene.add(sunDisc);
+    this._skyMat = skyMat;
   }
 
   _buildLights() {
-    const sun = new THREE.DirectionalLight(0xfff0d0, 2.4);
-    sun.position.set(120, 180, -80);
+    // Strong warm key light (low-ish sun => long dramatic shadows).
+    const sun = new THREE.DirectionalLight(0xffe9c2, 3.1);
+    sun.position.set(220, 240, -260);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     const c = sun.shadow.camera;
-    c.left = -160; c.right = 160; c.top = 160; c.bottom = -160;
-    c.near = 1; c.far = 600;
+    c.left = -180; c.right = 180; c.top = 180; c.bottom = -180;
+    c.near = 1; c.far = 800;
     sun.shadow.bias = -0.0004;
     this.scene.add(sun);
     this.sun = sun;
 
-    this.scene.add(new THREE.HemisphereLight(0xbfd6ff, 0xc2a26a, 0.75));
-    this.scene.add(new THREE.AmbientLight(0xffe8c0, 0.22));
+    // Cool sky fill / warm ground bounce for that HDR desert contrast.
+    this.scene.add(new THREE.HemisphereLight(0x9fc4ff, 0xd9a860, 0.85));
+    this.scene.add(new THREE.AmbientLight(0xfff0d0, 0.25));
+
+    // Subtle cool rim from opposite the sun to separate the car from the sand.
+    const rim = new THREE.DirectionalLight(0x88bbff, 0.7);
+    rim.position.set(-200, 120, 220);
+    this.scene.add(rim);
   }
 
   _buildGround() {
@@ -122,8 +141,9 @@ export class Environment {
     }
     geo.computeVertexNormals();
 
+    // Warm saturated sand with a hint of sheen for that "simulated HDR" look.
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xd9b673, roughness: 1.0, metalness: 0.0,
+      color: 0xe0ad5e, roughness: 0.92, metalness: 0.02,
     });
     const ground = new THREE.Mesh(geo, mat);
     ground.receiveShadow = true;
@@ -131,7 +151,7 @@ export class Environment {
   }
 
   _makeRock() {
-    const g = new THREE.IcosahedronGeometry(THREE.MathUtils.randFloat(0.8, 2.6), 0);
+    const g = new THREE.IcosahedronGeometry(THREE.MathUtils.randFloat(1.2, 3.6), 0);
     const pos = g.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       pos.setXYZ(
@@ -143,7 +163,7 @@ export class Environment {
     }
     g.computeVertexNormals();
     const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
-      color: 0x8a7a63, roughness: 1.0, flatShading: true,
+      color: 0xa5764a, roughness: 1.0, flatShading: true,
     }));
     m.castShadow = true;
     m.receiveShadow = true;
@@ -152,17 +172,17 @@ export class Environment {
 
   _makeCactus() {
     const grp = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x3f6d3a, roughness: 0.9 });
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 4, 8), mat);
-    trunk.position.y = 2;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x4a7d40, roughness: 0.85 });
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 5.5, 8), mat);
+    trunk.position.y = 2.75;
     grp.add(trunk);
     for (const s of [-1, 1]) {
-      if (Math.random() < 0.35) continue;
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.26, 1.6, 7), mat);
-      arm.position.set(s * 0.55, 2.2, 0);
+      if (Math.random() < 0.3) continue;
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.3, 2.0, 7), mat);
+      arm.position.set(s * 0.7, 3.0, 0);
       arm.rotation.z = s * 0.5;
-      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 1.3, 7), mat);
-      tip.position.set(s * 0.92, 3.1, 0);
+      const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 1.6, 7), mat);
+      tip.position.set(s * 1.15, 4.2, 0);
       grp.add(arm, tip);
     }
     grp.traverse((o) => { o.castShadow = true; });
@@ -173,17 +193,17 @@ export class Environment {
     const half = CONFIG.GROUND_SIZE / 2 - 20;
     let placed = 0;
     let attempts = 0;
-    const target = 220;
-    while (placed < target && attempts < target * 6) {
+    const target = 260;
+    while (placed < target && attempts < target * 8) {
       attempts++;
       const x = THREE.MathUtils.randFloatSpread(half * 2);
       const z = THREE.MathUtils.randFloatSpread(half * 2);
-      // keep props off the road
-      if (this._track && this._track.distanceToTrack(x, z) < CONFIG.TRACK_WIDTH + 6) continue;
-      const o = Math.random() < 0.68 ? this._makeRock() : this._makeCactus();
-      o.position.set(x, this._height(x, z), z);
+      // keep props off the road + shoulder
+      if (this._track && this._track.nearest(x, z).dist < CONFIG.TRACK_WIDTH + 8) continue;
+      const o = Math.random() < 0.66 ? this._makeRock() : this._makeCactus();
+      o.position.set(x, this._height(x, z) - 0.3, z);
       o.rotation.y = Math.random() * Math.PI * 2;
-      const s = THREE.MathUtils.randFloat(0.8, 1.6);
+      const s = THREE.MathUtils.randFloat(0.9, 1.8);
       o.scale.setScalar(s);
       this.scene.add(o);
       placed++;

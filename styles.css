@@ -33,6 +33,34 @@ html, body {
   z-index: 10;
 }
 
+/* Radial speed lines that intensify with velocity (sense of speed) */
+#speedlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse at center,
+      transparent 30%,
+      rgba(255, 255, 255, 0.0) 45%,
+      rgba(255, 245, 220, 0.35) 78%,
+      rgba(255, 235, 200, 0.6) 100%);
+  mix-blend-mode: screen;
+  transition: opacity 0.15s linear;
+}
+
+/* Warm flash + blue-shift vignette while boosting */
+#boostFlash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center,
+    transparent 40%, rgba(80, 180, 255, 0.35) 100%);
+  mix-blend-mode: screen;
+  transition: opacity 0.12s linear;
+}
+
 #speed {
   position: absolute;
   right: 32px;

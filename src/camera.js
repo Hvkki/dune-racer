@@ -3,8 +3,9 @@ import { CONFIG } from './config.js';
 
 // Smooth chase camera with speed-based FOV, boost kick, and screen shake.
 export class ChaseCamera {
-  constructor(camera) {
+  constructor(camera, heightFn) {
     this.camera = camera;
+    this.heightFn = heightFn || (() => 0);
     this.camera.fov = CONFIG.BASE_FOV;
     this.camera.updateProjectionMatrix();
     this._target = new THREE.Vector3();
@@ -37,8 +38,16 @@ export class ChaseCamera {
     const s = ChaseCamera._damp(CONFIG.CAM_DAMP, dt);
     this.camera.position.lerp(this._target, s);
 
+    // Never let the camera dip below (or graze) the sand: keep it at least
+    // MIN_ABOVE_TERRAIN above the ground under the camera's XZ. Prevents the
+    // view from clipping through dune crests on slopes.
+    const groundUnderCam = this.heightFn(this.camera.position.x, this.camera.position.z);
+    const minY = groundUnderCam + 2.2;
+    if (this.camera.position.y < minY) this.camera.position.y = minY;
+
     // look ahead of the car
     this._look.copy(car.pos).addScaledVector(fwd, CONFIG.CAM_LOOKAHEAD);
+    this._look.y += 0.8; // aim slightly up so the road ahead stays in frame
     this.camera.lookAt(this._look);
 
     // speed + boost FOV

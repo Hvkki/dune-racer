@@ -26,13 +26,16 @@ export const CONFIG = {
   BOOST_MIN_TO_START: 0.12,// can't re-trigger below this
 
   // --- camera ---
-  CAM_BACK: 8.5,
-  CAM_UP: 3.8,
-  CAM_LOOKAHEAD: 7,
+  CAM_BACK: 9.0,
+  CAM_UP: 4.2,
+  CAM_LOOKAHEAD: 9,
   CAM_DAMP: 0.0006,        // follow damping (lower = laggier)
-  BASE_FOV: 66,
-  FOV_SPEED_KICK: 12,
-  FOV_BOOST_KICK: 10,
+  BASE_FOV: 68,
+  FOV_SPEED_KICK: 16,
+  FOV_BOOST_KICK: 14,
+
+  // --- car ---
+  GROUND_CLEARANCE: 0.35,  // lift so the chassis rides on the sand
 
   // --- world ---
   GROUND_SIZE: 900,

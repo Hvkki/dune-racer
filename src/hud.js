@@ -12,6 +12,8 @@ export class HUD {
       lapTime: document.getElementById('lapTime'),
       bestTime: document.getElementById('bestTime'),
       cpHint: document.getElementById('cpHint'),
+      speedlines: document.getElementById('speedlines'),
+      boostFlash: document.getElementById('boostFlash'),
     };
     this.el.lapTotal.textContent = CONFIG.TOTAL_LAPS;
     this._cpTimer = 0;
@@ -36,6 +38,12 @@ export class HUD {
     const pct = (car.boost.meter * 100).toFixed(0);
     this.el.fill.style.width = pct + '%';
     this.el.fill.style.filter = car.boost.active ? 'brightness(1.5)' : 'none';
+
+    // sense of speed: speed lines ramp in above ~55% of top speed
+    const speedT = Math.min(car.speed / 62, 1.2);
+    const linesOpacity = Math.max(0, (speedT - 0.55) / 0.6);
+    this.el.speedlines.style.opacity = Math.min(linesOpacity, 0.9).toFixed(2);
+    this.el.boostFlash.style.opacity = car.boost.active ? '0.85' : '0';
 
     const lap = track.lap;
     this.el.lapNum.textContent = Math.min(lap.count + (lap.count === 0 ? 1 : 0) || 1, CONFIG.TOTAL_LAPS);

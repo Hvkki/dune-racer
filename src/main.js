@@ -42,6 +42,8 @@ class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.getElementById('app').appendChild(this.renderer.domElement);
@@ -61,7 +63,7 @@ class Game {
     this.car = new Car(this.scene, this.env.heightFn);
     this.car.reset(this.track.startPos, this.track.startHeading);
 
-    this.chase = new ChaseCamera(this.camera);
+    this.chase = new ChaseCamera(this.camera, this.env.heightFn);
     this.chase.snapTo(this.car);
 
     this.dust = new DustSystem(this.scene);
@@ -72,7 +74,7 @@ class Game {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.55, 0.4, 0.85
+      0.7, 0.6, 0.85
     );
     this.composer.addPass(this.bloom);
   }

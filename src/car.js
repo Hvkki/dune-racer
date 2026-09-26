@@ -24,9 +24,9 @@ export class Car {
   _buildMesh() {
     const car = new THREE.Group();
 
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff5722, roughness: 0.4, metalness: 0.5 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6, metalness: 0.3 });
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x113355, roughness: 0.2, metalness: 0.7 });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff3d2e, roughness: 0.28, metalness: 0.7 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.5, metalness: 0.5 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0a2540, roughness: 0.08, metalness: 0.9 });
 
     // main body
     const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.6, 4.2), bodyMat);
@@ -105,10 +105,11 @@ export class Car {
 
   reset(pos, heading) {
     this.pos.copy(pos);
-    this.pos.y = this.heightFn(pos.x, pos.z);
+    this.pos.y = this.heightFn(pos.x, pos.z) + CONFIG.GROUND_CLEARANCE;
     this.heading = heading;
     this.vel.set(0, 0, 0);
     this.driftFactor = 0;
+    this._prevVForward = 0;
     this.boost.meter = 1;
     this.boost.active = false;
   }
@@ -169,8 +170,9 @@ export class Car {
     this.vel.copy(fwd).multiplyScalar(vForward).addScaledVector(right, vLateral);
     this.pos.addScaledVector(this.vel, dt);
 
-    // stick to terrain height
-    this.pos.y = this.heightFn(this.pos.x, this.pos.z);
+    // stick to terrain height, with a small ground clearance so the chassis
+    // rides ON the sand rather than sinking into it.
+    this.pos.y = this.heightFn(this.pos.x, this.pos.z) + CONFIG.GROUND_CLEARANCE;
 
     this.speed = this.vel.length();
     this.driftFactor = Math.abs(vLateral) / (this.speed + 0.001);
@@ -180,18 +182,21 @@ export class Car {
 
   _applyToMesh(vLateral, vForward, dt) {
     this.mesh.position.copy(this.pos);
-    this.mesh.position.y += 0.0;
     this.mesh.rotation.y = this.heading;
-    // visual lean into the drift
-    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, -vLateral * 0.015, 0.2);
-    // slight pitch under accel/brake
-    this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, -vForward * 0.0015, 0.15);
+
+    // visual lean into the drift (tightly clamped so it never digs in)
+    const targetLean = THREE.MathUtils.clamp(-vLateral * 0.012, -0.12, 0.12);
+    this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, targetLean, 0.15);
+
+    // subtle pitch from acceleration change (not raw speed), tightly clamped
+    const accelSignal = (vForward - (this._prevVForward || 0)) / Math.max(dt, 1e-3);
+    this._prevVForward = vForward;
+    const targetPitch = THREE.MathUtils.clamp(-accelSignal * 0.002, -0.06, 0.06);
+    this.mesh.rotation.x = THREE.MathUtils.lerp(this.mesh.rotation.x, targetPitch, 0.1);
 
     // spin wheels based on forward speed
     const spin = vForward * dt * 2;
     for (const w of this._wheels) w.rotation.x += spin;
-    // steer front wheels visually
-    this._wheels[0].rotation.y = 0; // kept simple; body yaw conveys turning
 
     // nitro flames flicker
     for (const f of this._boostFlames) {
