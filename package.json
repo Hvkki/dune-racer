@@ -1,0 +1,23 @@
+{
+  "name": "dune-racer",
+  "version": "1.0.0",
+  "description": "A desert-themed arcade racing game built with Three.js — drift across procedural dunes and chain nitro boosts.",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8080",
+    "test": "node smoke-test.mjs"
+  },
+  "keywords": [
+    "threejs",
+    "game",
+    "arcade",
+    "racing",
+    "webgl",
+    "desert"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "puppeteer": "^23.11.1"
+  }
+}

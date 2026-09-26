@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Dune Racer — Desert Arcade Racing</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e0a95a'/%3E%3Cpath d='M4 22h24l-4-6H8z' fill='%23ff5722'/%3E%3Ccircle cx='11' cy='24' r='3' fill='%23222'/%3E%3Ccircle cx='21' cy='24' r='3' fill='%23222'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- Canvas mount -->
+  <div id="app"></div>
+
+  <!-- HUD overlay -->
+  <div id="hud" class="hidden">
+    <div id="lap">
+      <div class="lap-line">LAP <span id="lapNum">1</span><small>/ <span id="lapTotal">3</span></small></div>
+      <div class="time-line"><span id="lapTime">0.00</span><small>s</small></div>
+      <div class="best-line">BEST <span id="bestTime">--.--</span></div>
+    </div>
+
+    <div id="speed">
+      <span id="spd">0</span><small>km/h</small>
+    </div>
+
+    <div id="nitro">
+      <div class="nitro-label">NITRO</div>
+      <div class="nitro-bar"><div id="nitroFill"></div></div>
+    </div>
+
+    <div id="cpHint" class="cp-hint hidden">CHECKPOINT</div>
+  </div>
+
+  <!-- Start / menu screen -->
+  <div id="menu" class="overlay">
+    <div class="menu-card">
+      <h1 class="title">DUNE<span>RACER</span></h1>
+      <p class="subtitle">Desert Arcade Racing</p>
+      <button id="startBtn" class="btn">START RACE</button>
+      <div class="controls">
+        <div class="ctrl-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> <span>Drive &amp; Steer</span></div>
+        <div class="ctrl-row"><kbd>Space</kbd> <span>Nitro Boost</span></div>
+        <div class="ctrl-row"><kbd>Shift</kbd> <span>Drift</span></div>
+        <div class="ctrl-row"><kbd>R</kbd> <span>Reset car</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading screen -->
+  <div id="loading" class="overlay">
+    <div class="loader-text">LOADING DESERT…</div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
